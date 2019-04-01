@@ -82,4 +82,4 @@ jar_push:
     - runner01
   script:
     - apk add curl -y
-    - curl --fail -u admin:admin123 --upload-file target/*spring-petclinic*.jar 'http://10.200.6.177:8082/repository/nexus/sprint-petclinic-'${CI_JOB_ID}''
+    - curl --fail -u admin:admin123 --upload-file target/*spring-petclinic*.jar 'http://nexus:8082/repository/nexus/sprint-petclinic-'${CI_JOB_ID}''
