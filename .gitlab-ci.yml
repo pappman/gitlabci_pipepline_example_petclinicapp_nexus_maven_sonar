@@ -1,0 +1,85 @@
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN -Dorg.slf4j.simpleLogger.showDateTime=true -Djava.awt.headless=true"
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end --show-version -DinstallAtEnd=true -DdeployAtEnd=true"
+#
+cache:
+  paths:
+    - .m2/repository
+#
+stages:
+  - maven_build
+  - maven_test
+  - sonar_chk
+  - docker_build
+  - docker_deploy
+  - docker_push
+  - jar_push
+#
+maven_build:
+  image: maven:3.5.2-jdk-8
+  stage: maven_build
+  tags:
+    - runner01
+  script:
+    - echo -e "\n Build da aplicação. \n"
+    - mvn $MAVEN_CLI_OPTS package -DskipTests=true
+  artifacts:
+    paths:
+      - target/*spring-petclinic*.jar
+#
+maven_test:
+  image: maven:3.5.2-jdk-8
+  stage: maven_test
+  tags:
+    - runner01
+  script:
+    - echo -e "\n Teste unitário. \n"
+    - mvn $MAVEN_CLI_OPTS test
+#
+before_script:
+  - REVISION_STABLE=${CI_COMMIT_TAG}
+  - REVISION_UNSTABLE=${CI_COMMIT_REF_SLUG}+sha.${CI_COMMIT_SHA:0:8}
+  - SONAR_LOGIN=${TOKEN_SONAR}
+  - SONAR_URL=http://sonar:9000
+sonar_chk:
+  image: maven:3.5.2-jdk-8
+  stage: sonar_chk
+  tags:
+    - runner01
+  script:
+    - mvn --batch-mode verify sonar:sonar -Drevision=$REVISION_STABLE -Dsonar.host.url=$SONAR_URL -Dsonar.login=$SONAR_LOGIN -Dsonar.gitlab.project_id=$CI_PROJECT_PATH -Dsonar.gitlab.ref_name=$CI_COMMIT_REF_NAME -Dsonar.gitlab.commit_sha=$CI_COMMIT_SHA -Dsonar.gitlab.failure_notification_mode=exit-code -Dsonar.analysis.mode=publish
+#
+docker_build:
+  stage: docker_build
+  image: docker:stable
+  tags:
+    - runner01
+  script:
+    - docker info
+    - docker build -t petclinic_git .
+#
+docker_deploy:
+  stage: docker_deploy
+  tags:
+    - runner01
+  script:
+    - docker rm -f petclinic_c
+    - docker rmi -f petclinic_c
+    - docker run --name petclinic_c -d -p 8080:8080 petclinic_git
+#
+docker_push:
+  stage: docker_push
+  tags:
+    - runner01
+  script:
+    - docker tag petclinic_git localhost:8083/petclinic_app:1.0
+    - docker login -u admin -p admin123 localhost:8083
+    - docker push localhost:8083/petclinic_app:1.0
+#
+jar_push:
+  stage: jar_push
+  tags:
+    - runner01
+  script:
+    - apk add curl -y
+    - curl --fail -u admin:admin123 --upload-file target/*spring-petclinic*.jar 'http://10.200.6.177:8082/repository/nexus/sprint-petclinic-'${CI_JOB_ID}''

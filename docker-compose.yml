@@ -1,0 +1,85 @@
+version: "3.5"
+
+networks:
+  onboard_net:
+    external:
+      name: onboard_net
+
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    hostname: mysql
+    networks:
+      onboard_net:
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_HOST=localhost
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_ROOT_PASSWORD=onboard
+    volumes:
+      - /var/lib/mysql:/var/lib/mysql/
+      - ./mysql:/docker-entrypoint-initdb.d/
+    restart: "always"
+  nexus:
+    image: sonatype/nexus3
+    container_name: nexus
+    hostname: nexus
+    networks:
+      onboard_net:
+    ports:
+      - 8081:8081 # nexus management interface
+      - 8082:8082 # nexus docker registry
+    volumes:
+      - ~/volumes/nexus:/nexus-data
+    restart: "always"
+  #
+  gitlab:
+    image: "gitlab/gitlab-ce:10.1.4-ce.0"
+    container_name: gitlab
+    hostname: gitlab
+    networks:
+      onboard_net:
+    restart: always
+    ports:
+      - 443:443
+      - 80:80
+    volumes:
+      - ~/volumes/config:/etc/gitlab
+      - ~/volumes/logs:/var/log/gitlab
+      - ~/volumes/data:/var/opt/gitlab
+  #
+  gitlab_runner:
+    image: "gitlab/gitlab-runner:v10.1.0"
+    container_name: gitlab_runner
+    hostname: gitlab_runner
+    networks:
+      onboard_net:
+    restart: always
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "~/volumes/gitlab-runner/config:/etc/gitlab-runner"
+      - "/usr/local/bin/docker:/usr/local/bin/docker"
+    environment:
+      - COMPOSE_HTTP_TIMEOUT=200
+  #
+  sonarqube:
+    image: sonarqube
+    container_name: sonarqube
+    hostname: sonarqube
+    networks:
+      onboard_net:
+    restart: always
+    ports:
+      - 9000:9000
+    environment:
+      - SONARQUBE_JDBC_URL=jdbc:mysql://mysql:3306/sonar?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true&useConfigs=maxPerformance&useSSL=false
+      - SONARQUBE_JDBC_USERNAME=sonar
+      - SONARQUBE_JDBC_PASSWORD=sonar
+    volumes:
+      - "~/volumes/sonarqube/conf:/opt/sonarqube/conf"
+      - "~/volumes/sonarqube/data:/opt/sonarqube/data"
+      - "~/volumes/sonarqube/extensions:/opt/sonarqube/extensions"
+      - "~/Volumes/sonarqube/temp:/opt/sonarqube/temp"
