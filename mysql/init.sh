@@ -10,3 +10,9 @@ sleep 2
 mysql -uroot -ppetclinic petclinic < ./sql/schema.sql
 sleep 2
 mysql -uroot -ppetclinic petclinic < ./sql/data.sql
+sleep 2
+mysql -uroot -ppetclinic -e "create database sonar;"
+sleep 2
+mysql -uroot -ppetclinic -e "grant all privileges on sonar.* to 'sonar'@'%' identified by 'sonar';"
+sleep 2
+mysql -uroot -ppetclinic -e "flush privileges;"
